@@ -13,7 +13,8 @@ const NAME_OUT = 38;    // name anchors, outside the chairs
 const RT = Math.SQRT1_2;
 const MAX_PER_SIDE = 3;
 const GRID = 10;        // tables snap to this while dragging
-const PAD = 130;        // breathing room around the outermost table
+const PAD = 60;         // breathing room around the outermost label
+const NAME_W = 190;     // roughly how wide a "Surname Firstname" label runs
 
 const SIDE_KEYS = ["ne", "se", "sw", "nw"];
 const SIDE_LABEL = { ne: "Top right", se: "Bottom right", sw: "Bottom left", nw: "Top left" };
@@ -188,15 +189,39 @@ function rectSize(t) {
   return { len: Math.max(240, t.seats * 95), depth: 112 };
 }
 
-// Canvas big enough to hold every table plus its names.
-function viewBox() {
+// Bounds of the plan itself: used to fit the view and to frame exports.
+// Measured from the real chair and label positions, so a fit has no dead space.
+function contentBox() {
   if (!state.tables.length) return { x: 0, y: 0, w: 1200, h: 800 };
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const xs = [], ys = [];
+  const add = (x, y) => { xs.push(x); ys.push(y); };
+
   for (const t of state.tables) {
-    const reach = t.kind === "rect" ? rectSize(t).len / 2 + 120 : D + 120;
-    minX = Math.min(minX, t.x - reach); maxX = Math.max(maxX, t.x + reach);
-    minY = Math.min(minY, t.y - reach); maxY = Math.max(maxY, t.y + reach);
+    // Table outline
+    if (t.kind === "rect") {
+      const { len, depth } = rectSize(t);
+      for (const [lx, ly] of [[-len / 2, -depth / 2], [len / 2, -depth / 2], [len / 2, depth / 2], [-len / 2, depth / 2]]) {
+        const [rx, ry] = rot(lx, ly, t.angle);
+        add(t.x + rx, t.y + ry);
+      }
+    } else {
+      for (const [lx, ly] of [[0, -D], [D, 0], [0, D], [-D, 0]]) {
+        const [rx, ry] = rot(lx, ly, t.angle);
+        add(t.x + rx, t.y + ry);
+      }
+    }
+    // Chairs and the room their names take up
+    for (const s of seatGeometry(t)) {
+      add(s.x, s.y);
+      if (s.anchor === "start") add(s.tx + NAME_W, s.ty);
+      else if (s.anchor === "end") add(s.tx - NAME_W, s.ty);
+      else { add(s.tx - 60, s.ty - 26); add(s.tx + 60, s.ty + 10); }
+      add(s.tx, s.ty);
+    }
   }
+
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
   return { x: minX - PAD, y: minY - PAD, w: (maxX - minX) + PAD * 2, h: (maxY - minY) + PAD * 2 };
 }
 
@@ -282,24 +307,85 @@ function tableSvg(t, opts = {}) {
 }
 
 function planSvgInner(opts = {}) {
-  const vb = viewBox();
+  const vb = contentBox();
   const palette = PALETTES[opts.theme || currentTheme()];
+  // Only exported pictures paint their own background; on screen the stage
+  // supplies it, so panning never runs off the edge of a drawn rectangle.
+  const paper = opts.forExport
+    ? `<rect class="paper" x="${vb.x}" y="${vb.y}" width="${vb.w}" height="${vb.h}"/>`
+    : "";
   return {
     vb,
-    inner: `<style>${planCss(palette)}</style>
-      <rect class="paper" x="${vb.x}" y="${vb.y}" width="${vb.w}" height="${vb.h}"/>
-      ${state.tables.map(t => tableSvg(t, opts)).join("")}`,
+    inner: `<style>${planCss(palette)}</style>${paper}${state.tables.map(t => tableSvg(t, opts)).join("")}`,
   };
 }
 
 const plan = $("plan");
 
 function drawPlan() {
-  const { vb, inner } = planSvgInner();
-  plan.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
-  plan.style.minWidth = Math.min(1500, Math.round(vb.w * 0.62)) + "px";
-  plan.innerHTML = inner;
+  plan.innerHTML = planSvgInner().inner;
+  applyView();
 }
+
+// ── View: pan and zoom ──────────────────────────────────────
+const MIN_SCALE = 0.08, MAX_SCALE = 4;
+const VIEW_KEY = "table-plan.view";
+let view = null;                 // { cx, cy, scale } in plan coordinates
+let stageW = 900, stageH = 600;
+
+function measureStage() {
+  const r = $("stage").getBoundingClientRect();
+  if (r.width > 20 && r.height > 20) { stageW = r.width; stageH = r.height; }
+}
+
+function applyView() {
+  if (!view) return;
+  const w = stageW / view.scale, h = stageH / view.scale;
+  plan.setAttribute("viewBox", `${view.cx - w / 2} ${view.cy - h / 2} ${w} ${h}`);
+  $("zoom-level").textContent = Math.round(view.scale * 100) + "%";
+  try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch {}
+}
+
+// Frame the whole plan with a little room to spare.
+function fitView() {
+  measureStage();
+  const b = contentBox();
+  const scale = clamp(Math.min(stageW / b.w, stageH / b.h) * 0.96, MIN_SCALE, MAX_SCALE);
+  view = { cx: b.x + b.w / 2, cy: b.y + b.h / 2, scale };
+  applyView();
+}
+
+function zoomBy(factor, clientX, clientY) {
+  if (!view) return;
+  const anchor = (clientX == null)
+    ? { x: view.cx, y: view.cy }
+    : clientToPlan(clientX, clientY);
+  const next = clamp(view.scale * factor, MIN_SCALE, MAX_SCALE);
+  if (next === view.scale) return;
+  // Keep whatever is under the cursor pinned in place.
+  const k = 1 - view.scale / next;
+  view.cx += (anchor.x - view.cx) * k;
+  view.cy += (anchor.y - view.cy) * k;
+  view.scale = next;
+  applyView();
+}
+
+function clientToPlan(clientX, clientY) {
+  const pt = plan.createSVGPoint();
+  pt.x = clientX; pt.y = clientY;
+  return pt.matrixTransform(plan.getScreenCTM().inverse());
+}
+
+$("zoom-in").onclick = () => zoomBy(1.25);
+$("zoom-out").onclick = () => zoomBy(1 / 1.25);
+$("zoom-level").onclick = () => fitView();
+
+plan.addEventListener("wheel", e => {
+  e.preventDefault();
+  zoomBy(Math.exp(-e.deltaY * 0.0016), e.clientX, e.clientY);
+}, { passive: false });
+
+new ResizeObserver(() => { measureStage(); applyView(); }).observe($("stage"));
 
 // ── Side panels ─────────────────────────────────────────────
 // Split apart so a live slider drag can refresh the plan and the lists
@@ -423,7 +509,15 @@ const seatNode = ref => plan.querySelector(`.seat[data-table="${ref.tid}"][data-
 plan.addEventListener("pointerdown", e => {
   const seatEl = e.target.closest(".seat");
   const tableEl = e.target.closest(".tg");
-  if (!tableEl) return;
+
+  if (!tableEl) {                       // empty background: pan the view
+    drag = { kind: "pan", startX: e.clientX, startY: e.clientY, cx: view.cx, cy: view.cy, moved: false };
+    plan.classList.add("panning");
+    try { plan.setPointerCapture(e.pointerId); } catch {}
+    e.preventDefault();
+    return;
+  }
+
   const start = toSvg(e);
 
   if (seatEl) {
@@ -440,6 +534,15 @@ plan.addEventListener("pointerdown", e => {
 
 plan.addEventListener("pointermove", e => {
   if (!drag) return;
+
+  if (drag.kind === "pan") {
+    drag.moved = true;
+    view.cx = drag.cx - (e.clientX - drag.startX) / view.scale;
+    view.cy = drag.cy - (e.clientY - drag.startY) / view.scale;
+    applyView();
+    return;
+  }
+
   const p = toSvg(e);
   const dx = p.x - drag.start.x, dy = p.y - drag.start.y;
   if (!drag.moved && Math.hypot(dx, dy) < THRESHOLD) return;
@@ -467,6 +570,12 @@ plan.addEventListener("pointerup", e => {
   const d = drag; drag = null;
   try { plan.releasePointerCapture(e.pointerId); } catch { /* already gone */ }
 
+  if (d.kind === "pan") {
+    plan.classList.remove("panning");
+    if (!d.moved) { selectedTable = null; selectedPerson = null; render(); }
+    return;
+  }
+
   if (!d.moved) {                       // a click, not a drag
     d.el.removeAttribute("transform");
     if (d.kind === "seat") clickSeat(d.tid, d.idx);
@@ -488,7 +597,10 @@ plan.addEventListener("pointerup", e => {
   render();
 });
 
-plan.addEventListener("pointercancel", () => { if (drag) { drag = null; render(); } });
+plan.addEventListener("pointercancel", () => {
+  if (!drag) return;
+  drag = null; plan.classList.remove("panning"); render();
+});
 
 // Click a chair: seat the person you picked, or select whoever is sitting there.
 function clickSeat(tid, idx) {
@@ -618,8 +730,8 @@ function addTable(kind) {
   selectedTable = t.id; selectedPerson = null;
   commit(); render();
 }
-$("add-diamond").onclick = () => addTable("diamond");
-$("add-rect").onclick = () => addTable("rect");
+$("add-diamond").onclick = () => { closeMenus(); addTable("diamond"); };
+$("add-rect").onclick = () => { closeMenus(); addTable("rect"); };
 
 // ── Undo ────────────────────────────────────────────────────
 $("undo").disabled = true;
@@ -687,7 +799,7 @@ function exportSvg() {
 
 function exportPng() {
   const svg = buildSvgString();
-  const vb = viewBox();
+  const vb = contentBox();
   const scale = Math.min(2, 4000 / vb.w);
   const img = new Image();
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
@@ -705,16 +817,25 @@ function exportPng() {
   img.src = url;
 }
 
-$("export-btn").onclick = () => {
-  const m = $("export-menu");
-  m.hidden = !m.hidden;
-  $("export-btn").setAttribute("aria-expanded", String(!m.hidden));
+const MENUS = [["export-btn", "export-menu"], ["add-btn", "add-menu"]];
+const closeMenus = except => {
+  for (const [btn, list] of MENUS) {
+    if (list === except) continue;
+    $(list).hidden = true;
+    $(btn).setAttribute("aria-expanded", "false");
+  }
 };
+for (const [btn, list] of MENUS) {
+  $(btn).onclick = () => {
+    const open = $(list).hidden;
+    closeMenus();
+    $(list).hidden = !open;
+    $(btn).setAttribute("aria-expanded", String(open));
+  };
+}
 // pointerdown, not click: the plan calls preventDefault on pointerdown, which
-// would swallow the click and leave this menu hanging open over the tables.
-document.addEventListener("pointerdown", e => {
-  if (!e.target.closest(".menu")) { $("export-menu").hidden = true; $("export-btn").setAttribute("aria-expanded", "false"); }
-});
+// would swallow the click and leave a menu hanging open over the tables.
+document.addEventListener("pointerdown", e => { if (!e.target.closest(".menu")) closeMenus(); });
 $("export-menu").addEventListener("click", e => {
   const b = e.target.closest("button[data-export]"); if (!b) return;
   $("export-menu").hidden = true;
@@ -732,7 +853,7 @@ $("file-input").addEventListener("change", async e => {
     }
     state = normalise(parsed);
     selectedTable = null; selectedPerson = null;
-    commit(false); resetHistory(); render();
+    commit(false); resetHistory(); render(); fitView();
     setStatus("Opened");
   } catch {
     alert("That file does not look like a saved plan. Pick a .json file that this app saved.");
@@ -748,8 +869,18 @@ $("restore").onclick = () => {
   )) return;
   state = normalise(window.DEFAULT_PLAN || { name: "Table plan", guests: [], tables: [] });
   selectedTable = null; selectedPerson = null;
-  commit(false); resetHistory(); render();
+  commit(false); resetHistory(); render(); fitView();
 };
+
+// ── Side panel ──────────────────────────────────────────────
+const SIDE_KEY = "table-plan.side";
+function setSide(collapsed) {
+  $("layout").classList.toggle("collapsed", collapsed);
+  $("toggle-side").setAttribute("aria-pressed", String(collapsed));
+  try { localStorage.setItem(SIDE_KEY, collapsed ? "1" : "0"); } catch {}
+  // The stage just changed width; ResizeObserver refits the viewBox.
+}
+$("toggle-side").onclick = () => setSide(!$("layout").classList.contains("collapsed"));
 
 // ── Boot ────────────────────────────────────────────────────
 try {
@@ -759,7 +890,21 @@ try {
   }
 } catch {}
 
+try {
+  if (localStorage.getItem(SIDE_KEY) === "1") setSide(true);
+} catch {}
+
 state = loadState();
 snapshot = JSON.stringify(state);
+
+measureStage();
+try {
+  const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "null");
+  if (saved && Number.isFinite(saved.cx) && Number.isFinite(saved.cy) && saved.scale > 0) {
+    view = { cx: saved.cx, cy: saved.cy, scale: clamp(saved.scale, MIN_SCALE, MAX_SCALE) };
+  }
+} catch {}
+
 render();
+if (!view) fitView();
 setStatus("Saved");

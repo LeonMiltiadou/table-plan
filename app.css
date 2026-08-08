@@ -54,27 +54,28 @@ body {
 }
 
 /* ── top bar ───────────────────────────────────────────────── */
+/* Deliberately thin: the plan is the thing worth looking at. */
 .topbar {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
-  flex-wrap: wrap;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 5px 10px; border-bottom: 1px solid var(--line); background: var(--panel);
+  flex-wrap: nowrap; min-height: 38px;
 }
-.brand { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
-.brand strong { letter-spacing: -.01em; }
+.brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brand strong { letter-spacing: -.01em; font-size: 13px; white-space: nowrap; }
 .plan-name {
-  font: inherit; color: var(--ink); background: transparent;
-  border: 1px solid transparent; border-radius: 6px; padding: 4px 8px; min-width: 12ch; max-width: 40ch;
+  font: inherit; font-size: 13px; color: var(--ink); background: transparent;
+  border: 1px solid transparent; border-radius: 6px; padding: 2px 6px; min-width: 8ch; max-width: 28ch;
 }
 .plan-name:hover { border-color: var(--line); }
 .plan-name:focus { outline: none; border-color: var(--accent); background: var(--bg); }
 
-.tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.status { color: var(--faint); font-size: 12px; min-width: 76px; }
-.divider { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+.tools { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; overflow-x: auto; }
+.status { color: var(--faint); font-size: 11.5px; min-width: 58px; }
+.divider { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
 
 button {
-  font: inherit; font-size: 13px; color: var(--ink); background: var(--panel);
-  border: 1px solid var(--edge); border-radius: 8px; padding: 6px 11px; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--ink); background: var(--panel);
+  border: 1px solid var(--edge); border-radius: 7px; padding: 4px 9px; cursor: pointer;
   white-space: nowrap;
 }
 button:hover { border-color: var(--accent); }
@@ -93,13 +94,42 @@ button.danger:hover { border-color: var(--danger); }
 .menu-list button:hover { background: var(--bg); }
 
 /* ── layout ────────────────────────────────────────────────── */
-.layout { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0; }
-.stage { overflow: auto; min-width: 0; }
-#plan { display: block; width: 100%; height: auto; touch-action: none; }
+/* Fluid across desktop sizes: the panel gives ground before the plan does. */
+.layout {
+  flex: 1; display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(240px, 21vw, 320px);
+  min-height: 0;
+}
+.layout.collapsed { grid-template-columns: minmax(0, 1fr); }
+.layout.collapsed .side { display: none; }
+
+.stage-wrap { position: relative; min-width: 0; overflow: hidden; }
+/* The view is driven by the SVG viewBox, so the stage itself never scrolls. */
+.stage { position: absolute; inset: 0; overflow: hidden; }
+#plan { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#plan.panning { cursor: grabbing; }
+
+.zoom {
+  position: absolute; left: 12px; bottom: 12px; z-index: 5;
+  display: flex; align-items: stretch; gap: 0;
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 9px;
+  overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.22);
+}
+.zoom button { border: 0; border-radius: 0; padding: 5px 11px; background: transparent; }
+.zoom button:hover { background: var(--bg); }
+.zoom #zoom-level {
+  min-width: 62px; text-align: center; color: var(--dim);
+  border-left: 1px solid var(--line); border-right: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.pan-hint {
+  position: absolute; right: 12px; bottom: 14px; margin: 0; z-index: 5;
+  color: var(--faint); font-size: 11.5px; pointer-events: none;
+}
 
 .side {
   border-left: 1px solid var(--line); background: var(--panel);
-  overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px;
+  overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;
 }
 
 .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
@@ -113,7 +143,10 @@ button.danger:hover { border-color: var(--danger); }
 }
 .tip { color: var(--faint); font-size: 12px; margin: 0 0 8px; }
 
-.people { list-style: none; margin: 0 0 10px; padding: 0; max-height: 260px; overflow-y: auto; }
+.people {
+  list-style: none; margin: 0 0 10px; padding: 0;
+  max-height: min(260px, 28vh); overflow-y: auto;
+}
 .people li {
   padding: 5px 8px; border-radius: 6px; cursor: pointer; display: flex; gap: 6px; align-items: center;
 }
@@ -163,9 +196,24 @@ input[type=range] {
 .notes b { color: var(--ink); font-weight: 600; }
 .notes .warn { color: var(--warn); }
 
+/* Narrower desktop windows: shed the hint, then the panel. */
+@media (max-width: 1280px) { .pan-hint { display: none; } }
+
+@media (max-width: 1080px) {
+  .topbar { flex-wrap: wrap; }
+  .brand strong { display: none; }
+  .status { display: none; }
+}
+
 @media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; }
-  .side { border-left: 0; border-top: 1px solid var(--line); }
+  .layout { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .side { border-left: 0; border-top: 1px solid var(--line); max-height: 45vh; }
+}
+
+/* Short windows: the panel scrolls rather than pushing the plan away. */
+@media (max-height: 700px) {
+  .card { padding: 10px; }
+  .howto { display: none; }
 }
 
 /* how-to + selected person */

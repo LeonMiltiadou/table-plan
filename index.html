@@ -20,10 +20,13 @@
   <div class="tools">
     <span class="status" id="status">Saved</span>
 
-    <button id="add-diamond">Add table</button>
-    <button id="add-rect">Add long table</button>
-
-    <span class="divider" role="separator"></span>
+    <div class="menu">
+      <button id="add-btn" aria-haspopup="true" aria-expanded="false">Add ▾</button>
+      <div class="menu-list" id="add-menu" hidden>
+        <button id="add-diamond">Diamond table</button>
+        <button id="add-rect">Long table</button>
+      </div>
+    </div>
 
     <button id="undo" title="Undo the last change (Ctrl/Cmd+Z)">Undo</button>
 
@@ -39,17 +42,26 @@
 
     <button id="import" title="Open a backup file you saved earlier">Open backup</button>
     <button id="theme">Light</button>
-    <button id="restore" class="danger" title="Throw this plan away and load the example one">Reset to example</button>
+    <button id="restore" class="danger" title="Throw this plan away and load the example one">Reset</button>
+    <button id="toggle-side" title="Show or hide the side panel" aria-pressed="false">Panel</button>
   </div>
 </header>
 
-<main class="layout">
+<main class="layout" id="layout">
 
-  <div class="stage" id="stage">
-    <svg id="plan" xmlns="http://www.w3.org/2000/svg" aria-label="Seating plan"></svg>
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <svg id="plan" xmlns="http://www.w3.org/2000/svg" aria-label="Seating plan"></svg>
+    </div>
+    <div class="zoom">
+      <button id="zoom-out" title="Zoom out">−</button>
+      <button id="zoom-level" title="Fit the whole plan on screen">100%</button>
+      <button id="zoom-in" title="Zoom in">+</button>
+    </div>
+    <p class="pan-hint">Drag the background to move around · scroll to zoom</p>
   </div>
 
-  <aside class="side">
+  <aside class="side" id="side">
 
     <section class="card howto">
       <h2>How to use</h2>
@@ -58,6 +70,7 @@
         <li><b>Move a table</b> — drag the table itself.</li>
         <li><b>Seat someone</b> — click their name under Unseated, then click an empty chair.</li>
         <li><b>Take someone off</b> — click their name on the plan, then click Unseat.</li>
+        <li><b>Move around</b> — drag the empty background; scroll to zoom.</li>
       </ul>
       <p class="tip">Everything saves by itself. Use Undo if something goes wrong.</p>
     </section>

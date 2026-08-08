@@ -14,6 +14,9 @@ No build step, no server, no dependencies — three static files and a data file
 | Seat someone | Click their name under **Unseated**, then click an empty chair |
 | Take someone off a table | Click their name on the plan, then **Unseat** |
 | Add or remove chairs | Click a table, then drag the slider or type a number (max 3 per side) |
+| Move around the plan | Drag the empty background |
+| Zoom | Scroll, or the **−** / **+** buttons; click the percentage to fit everything |
+| Hide the side panel | **Panel** |
 | Undo | **Undo**, or Ctrl/Cmd+Z |
 
 Changes save in the browser as you go. Nothing is sent anywhere — there is no
