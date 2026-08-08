@@ -13,7 +13,7 @@ No build step, no server, no dependencies — three static files and a data file
 | Move a table | Drag the table itself |
 | Seat someone | Click their name under **Unseated**, then click an empty chair |
 | Take someone off a table | Click their name on the plan, then **Unseat** |
-| Add or remove chairs | Click a table, then use the **+** / **−** buttons (max 3 per side) |
+| Add or remove chairs | Click a table, then drag the slider or type a number (max 3 per side) |
 | Undo | **Undo**, or Ctrl/Cmd+Z |
 
 Changes save in the browser as you go. Nothing is sent anywhere — there is no
@@ -26,7 +26,8 @@ Two shapes:
 - **Diamond** — chairs on four runs, up to three per run, so 0–12 chairs.
 - **Long table** — chairs along one side, 1–14 of them.
 
-Both can be rotated with the **Angle** slider.
+Both can be rotated. Every number — chairs per side, chair count, angle — has a
+slider and a number box side by side; use whichever suits, they stay in step.
 
 ### Saving and sharing
 

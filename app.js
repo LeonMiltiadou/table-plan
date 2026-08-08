@@ -127,6 +127,13 @@ function commit(pushUndo = true) {
 }
 const setStatus = t => { $("status").textContent = t; };
 
+// Opening a different plan replaces everything, so there is nothing sensible to
+// step back into — clear the history rather than let Undo wipe what was loaded.
+function resetHistory() {
+  undoStack.length = 0;
+  $("undo").disabled = true;
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORE);
@@ -295,16 +302,17 @@ function drawPlan() {
 }
 
 // ── Side panels ─────────────────────────────────────────────
-function drawPanels() {
-  $("plan-name").value = state.name;
-
+// Split apart so a live slider drag can refresh the plan and the lists
+// without rebuilding the very control being dragged.
+function drawUnseated() {
   const free = unseated();
   $("unseated-count").textContent = free.length;
   $("unseated").innerHTML = free.length
     ? free.map(g => `<li data-guest="${g.id}"${selectedPerson && !selectedPerson.tableId && selectedPerson.guestId === g.id ? ' class="sel"' : ""}>${esc(g.last)} <span class="given">${esc(g.first)}</span></li>`).join("")
     : `<li class="empty">Everyone has a seat.</li>`;
+}
 
-  // Selected person
+function drawPerson() {
   const pc = $("person-card");
   if (selectedPerson && selectedPerson.tableId) {
     const g = guestById(selectedPerson.guestId);
@@ -313,31 +321,46 @@ function drawPanels() {
   } else {
     pc.hidden = true;
   }
+}
 
-  // Selected table
+// A slider and its number box always show the same value.
+function setPair(base, value) {
+  const r = $(base + "-range"), n = $(base + "-num");
+  if (r) r.value = value;
+  if (n) n.value = value;
+}
+
+function drawTableCard() {
   const t = tableById(selectedTable);
   const card = $("table-card");
-  if (!t) { card.hidden = true; } else {
-    card.hidden = false;
-    $("t-name").value = t.name;
-    $("t-angle").value = t.angle;
-    $("t-angle-out").value = t.angle + "°";
-    $("diamond-controls").hidden = t.kind !== "diamond";
-    $("rect-controls").hidden = t.kind !== "rect";
-    if (t.kind === "rect") $("t-seats").value = t.seats;
-    else {
-      $("sides").innerHTML = SIDE_KEYS.map(k => `
-        <div class="side-ctl">
-          <span>${SIDE_LABEL[k]}</span>
-          <span class="row">
-            <button data-side="${k}" data-delta="-1" ${t.sides[k] <= 0 ? "disabled" : ""}>−</button>
-            <span class="n">${t.sides[k]}</span>
-            <button data-side="${k}" data-delta="1" ${t.sides[k] >= MAX_PER_SIDE ? "disabled" : ""}>+</button>
-          </span>
-        </div>`).join("");
-    }
-  }
+  if (!t) { card.hidden = true; return; }
+  card.hidden = false;
+  $("t-name").value = t.name;
+  setPair("t-angle", t.angle);
+  $("diamond-controls").hidden = t.kind !== "diamond";
+  $("rect-controls").hidden = t.kind !== "rect";
 
+  if (t.kind === "rect") {
+    setPair("t-seats", t.seats);
+  } else {
+    $("sides").innerHTML = SIDE_KEYS.map(k => `
+      <div class="ctl">
+        <label for="side-${k}-num">${SIDE_LABEL[k]}</label>
+        <input id="side-${k}-range" type="range" min="0" max="${MAX_PER_SIDE}" step="1" value="${t.sides[k]}" data-side="${k}">
+        <input id="side-${k}-num" type="number" min="0" max="${MAX_PER_SIDE}" step="1" value="${t.sides[k]}" data-side="${k}">
+      </div>`).join("");
+  }
+}
+
+function drawPanels() {
+  $("plan-name").value = state.name;
+  drawUnseated();
+  drawPerson();
+  drawTableCard();
+  drawNotes();
+}
+
+function drawNotes() {
   // Food notes
   const notes = [];
   for (const tb of state.tables) {
@@ -521,36 +544,56 @@ $("t-name").addEventListener("input", e => {
 });
 $("t-name").addEventListener("change", () => commit());
 
-$("t-angle").addEventListener("input", e => {
-  const t = tableById(selectedTable); if (!t) return;
-  t.angle = +e.target.value; $("t-angle-out").value = t.angle + "°"; drawPlan();
-});
-$("t-angle").addEventListener("change", () => commit());
+// Both halves of a pair drive the same value: live feedback while you drag or
+// type, and a single undo step once the interaction finishes.
+function bindPair(base, onLive, onDone) {
+  for (const el of [$(base + "-range"), $(base + "-num")]) {
+    el.addEventListener("input", e => {
+      const raw = Math.round(+e.target.value);
+      if (!Number.isFinite(raw)) return;              // mid-typing, e.g. "-"
+      const v = clamp(raw, +e.target.min, +e.target.max);
+      setPair(base, v);
+      onLive(v);
+    });
+    el.addEventListener("change", e => {
+      const v = clamp(Math.round(+e.target.value) || 0, +e.target.min, +e.target.max);
+      setPair(base, v);
+      onDone(v);
+    });
+  }
+}
 
-$("t-seats").addEventListener("change", e => {
-  const t = tableById(selectedTable); if (!t || t.kind !== "rect") return;
-  setSeatCount(t, () => { t.seats = clamp(Math.round(+e.target.value || 1), 1, 14); });
-});
+bindPair("t-angle",
+  v => { const t = tableById(selectedTable); if (t) { t.angle = v; drawPlan(); } },
+  v => { const t = tableById(selectedTable); if (t) { t.angle = v; drawPlan(); commit(); } });
 
-$("sides").addEventListener("click", e => {
-  const btn = e.target.closest("button[data-side]"); if (!btn) return;
-  const t = tableById(selectedTable); if (!t || t.kind !== "diamond") return;
-  const k = btn.dataset.side, delta = +btn.dataset.delta;
-  setSeatCount(t, () => { t.sides[k] = clamp(t.sides[k] + delta, 0, MAX_PER_SIDE); });
-});
+bindPair("t-seats",
+  v => { const t = tableById(selectedTable); if (t?.kind === "rect") reseat(t, () => { t.seats = v; }, false); },
+  v => { const t = tableById(selectedTable); if (t?.kind === "rect") reseat(t, () => { t.seats = v; }, true); });
 
-// Change a table's chairs while keeping whoever can still fit.
-function setSeatCount(t, mutate) {
-  const before = state.seating[t.id].slice();
+// The four side controls are rebuilt with the panel, so delegate to them.
+for (const evt of ["input", "change"]) {
+  $("sides").addEventListener(evt, e => {
+    const el = e.target.closest("[data-side]"); if (!el) return;
+    const t = tableById(selectedTable); if (!t || t.kind !== "diamond") return;
+    const k = el.dataset.side;
+    const raw = Math.round(+el.value);
+    if (!Number.isFinite(raw)) return;
+    const v = clamp(raw, 0, MAX_PER_SIDE);
+    setPair(`side-${k}`, v);
+    reseat(t, () => { t.sides[k] = v; }, evt === "change");
+  });
+}
+
+// Change a table's chairs, keeping whoever still fits; the rest go to Unseated.
+function reseat(t, mutate, done) {
+  const people = state.seating[t.id].filter(Boolean);
   mutate();
-  const size = seatTotal(t);
-  const row = Array.from({ length: size }, () => null);
-  // Re-seat in order; anyone who no longer fits drops to Unseated.
-  const people = before.filter(Boolean);
-  const geoCount = size;
-  for (let i = 0, p = 0; i < geoCount && p < people.length; i++) row[i] = people[p++];
+  const row = Array.from({ length: seatTotal(t) }, () => null);
+  for (let i = 0; i < row.length && i < people.length; i++) row[i] = people[i];
   state.seating[t.id] = row;
-  commit(); render();
+  drawPlan(); drawUnseated(); drawNotes();
+  if (done) commit();
 }
 
 $("t-delete").onclick = () => {
@@ -689,7 +732,7 @@ $("file-input").addEventListener("change", async e => {
     }
     state = normalise(parsed);
     selectedTable = null; selectedPerson = null;
-    commit(); render();
+    commit(false); resetHistory(); render();
     setStatus("Opened");
   } catch {
     alert("That file does not look like a saved plan. Pick a .json file that this app saved.");
@@ -705,7 +748,7 @@ $("restore").onclick = () => {
   )) return;
   state = normalise(window.DEFAULT_PLAN || { name: "Table plan", guests: [], tables: [] });
   selectedTable = null; selectedPerson = null;
-  commit(); render();
+  commit(false); resetHistory(); render();
 };
 
 // ── Boot ────────────────────────────────────────────────────

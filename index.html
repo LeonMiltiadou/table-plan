@@ -82,26 +82,30 @@
 
     <section class="card" id="table-card" hidden>
       <h2>Selected table</h2>
-      <label class="field">
-        <span>Name</span>
-        <input id="t-name" autocomplete="off">
-      </label>
+
+      <div class="ctl">
+        <label for="t-name">Name</label>
+        <input id="t-name" class="wide" autocomplete="off">
+      </div>
 
       <div id="diamond-controls">
         <p class="tip">Chairs on each side — up to 3.</p>
-        <div class="sides" id="sides"></div>
+        <div id="sides"></div>
       </div>
 
-      <label class="field" id="rect-controls" hidden>
-        <span>Chairs</span>
-        <input id="t-seats" type="number" min="1" max="14" step="1">
-      </label>
+      <div id="rect-controls" hidden>
+        <div class="ctl">
+          <label for="t-seats-num">Chairs</label>
+          <input id="t-seats-range" type="range" min="1" max="14" step="1">
+          <input id="t-seats-num" type="number" min="1" max="14" step="1">
+        </div>
+      </div>
 
-      <label class="field">
-        <span>Angle</span>
-        <input id="t-angle" type="range" min="-90" max="90" step="1">
-        <output id="t-angle-out"></output>
-      </label>
+      <div class="ctl">
+        <label for="t-angle-num">Angle</label>
+        <input id="t-angle-range" type="range" min="-90" max="90" step="1">
+        <input id="t-angle-num" type="number" min="-90" max="90" step="1">
+      </div>
 
       <div class="row end">
         <button id="t-delete" class="danger">Delete table</button>
