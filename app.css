@@ -37,6 +37,10 @@ html[data-theme="light"] {
 
 * { box-sizing: border-box; }
 
+/* Class rules like `display: flex` outrank the browser's `[hidden] { display: none }`,
+   which would leave menus and panels stuck open. Settle it once, here. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);

@@ -667,7 +667,9 @@ $("export-btn").onclick = () => {
   m.hidden = !m.hidden;
   $("export-btn").setAttribute("aria-expanded", String(!m.hidden));
 };
-document.addEventListener("click", e => {
+// pointerdown, not click: the plan calls preventDefault on pointerdown, which
+// would swallow the click and leave this menu hanging open over the tables.
+document.addEventListener("pointerdown", e => {
   if (!e.target.closest(".menu")) { $("export-menu").hidden = true; $("export-btn").setAttribute("aria-expanded", "false"); }
 });
 $("export-menu").addEventListener("click", e => {
