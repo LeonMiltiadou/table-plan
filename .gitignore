@@ -1,0 +1,11 @@
+# Real guest lists never belong in this repo — they are personal data.
+# Keep them outside it, or here under private/ where git will not see them.
+private/
+*.local.json
+table-plan-real.json
+
+.DS_Store
+node_modules/
+.vercel
+
+.claude/

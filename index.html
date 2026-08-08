@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Table Plan</title>
+<meta name="description" content="Drag tables and guests around a seating plan. Saves as you go.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🪑</text></svg>">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <strong>Table Plan</strong>
+    <input id="plan-name" class="plan-name" aria-label="Plan name" spellcheck="false">
+  </div>
+
+  <div class="tools">
+    <span class="status" id="status">Saved</span>
+
+    <button id="add-diamond">Add table</button>
+    <button id="add-rect">Add long table</button>
+
+    <span class="divider" role="separator"></span>
+
+    <button id="undo" title="Undo the last change (Ctrl/Cmd+Z)">Undo</button>
+
+    <div class="menu">
+      <button id="export-btn" aria-haspopup="true" aria-expanded="false">Save &amp; share ▾</button>
+      <div class="menu-list" id="export-menu" hidden>
+        <button data-export="png">Picture, for printing or WhatsApp</button>
+        <button data-export="csv">Guest list, for a spreadsheet</button>
+        <button data-export="json">Backup file, to reopen later</button>
+        <button data-export="svg">Picture, sharp at any size</button>
+      </div>
+    </div>
+
+    <button id="import" title="Open a backup file you saved earlier">Open backup</button>
+    <button id="theme">Light</button>
+    <button id="restore" class="danger" title="Throw this plan away and load the example one">Reset to example</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <div class="stage" id="stage">
+    <svg id="plan" xmlns="http://www.w3.org/2000/svg" aria-label="Seating plan"></svg>
+  </div>
+
+  <aside class="side">
+
+    <section class="card howto">
+      <h2>How to use</h2>
+      <ul class="steps">
+        <li><b>Swap two people</b> — drag one name onto another.</li>
+        <li><b>Move a table</b> — drag the table itself.</li>
+        <li><b>Seat someone</b> — click their name under Unseated, then click an empty chair.</li>
+        <li><b>Take someone off</b> — click their name on the plan, then click Unseat.</li>
+      </ul>
+      <p class="tip">Everything saves by itself. Use Undo if something goes wrong.</p>
+    </section>
+
+    <section class="card" id="person-card" hidden>
+      <h2>Selected person</h2>
+      <p class="person-name" id="person-name"></p>
+      <div class="row end">
+        <button id="unseat">Unseat</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Unseated <span class="badge" id="unseated-count">0</span></h2>
+      <p class="tip">Click a name, then click an empty chair on the plan.</p>
+      <ul class="people" id="unseated"></ul>
+      <div class="row">
+        <input id="new-guest" placeholder="Add someone — Last, First" autocomplete="off">
+        <button id="add-guest">Add</button>
+      </div>
+    </section>
+
+    <section class="card" id="table-card" hidden>
+      <h2>Selected table</h2>
+      <label class="field">
+        <span>Name</span>
+        <input id="t-name" autocomplete="off">
+      </label>
+
+      <div id="diamond-controls">
+        <p class="tip">Chairs on each side — up to 3.</p>
+        <div class="sides" id="sides"></div>
+      </div>
+
+      <label class="field" id="rect-controls" hidden>
+        <span>Chairs</span>
+        <input id="t-seats" type="number" min="1" max="14" step="1">
+      </label>
+
+      <label class="field">
+        <span>Angle</span>
+        <input id="t-angle" type="range" min="-90" max="90" step="1">
+        <output id="t-angle-out"></output>
+      </label>
+
+      <div class="row end">
+        <button id="t-delete" class="danger">Delete table</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Food notes</h2>
+      <ul class="legend">
+        <li><i class="dot"></i>Standard</li>
+        <li><i class="dot vegan"></i>Vegan</li>
+        <li><i class="dot vegetarian"></i>Vegetarian</li>
+        <li><i class="dot pescatarian"></i>Pescatarian</li>
+        <li><i class="dot other"></i>Other</li>
+        <li><i class="dot ring"></i>Allergy</li>
+      </ul>
+      <ul class="notes" id="diet-notes"></ul>
+    </section>
+
+  </aside>
+</main>
+
+<input type="file" id="file-input" accept="application/json,.json" hidden>
+
+<script src="plan-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
