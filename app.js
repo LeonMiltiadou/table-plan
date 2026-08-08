@@ -355,6 +355,19 @@ function fitView() {
   applyView();
 }
 
+// Does the current view actually have the plan in it?
+function viewShowsPlan() {
+  if (!view) return false;
+  const b = contentBox();
+  const w = stageW / view.scale, h = stageH / view.scale;
+  const vx = view.cx - w / 2, vy = view.cy - h / 2;
+  const overlapW = Math.min(vx + w, b.x + b.w) - Math.max(vx, b.x);
+  const overlapH = Math.min(vy + h, b.y + b.h) - Math.max(vy, b.y);
+  if (overlapW <= 0 || overlapH <= 0) return false;              // looking at nothing
+  const fitScale = Math.min(stageW / b.w, stageH / b.h);
+  return view.scale > fitScale * 0.3;                            // not uselessly far out
+}
+
 function zoomBy(factor, clientX, clientY) {
   if (!view) return;
   const anchor = (clientX == null)
@@ -906,5 +919,7 @@ try {
 } catch {}
 
 render();
-if (!view) fitView();
+// A remembered view is only worth keeping if it still frames the plan. Anything
+// that would open on an empty expanse gets refitted instead.
+if (!view || !viewShowsPlan()) fitView();
 setStatus("Saved");

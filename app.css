@@ -48,6 +48,7 @@ body {
   font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   height: 100vh;
+  height: 100dvh;          /* fills the window even with dynamic browser chrome */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -60,7 +61,7 @@ body {
   padding: 5px 10px; border-bottom: 1px solid var(--line); background: var(--panel);
   flex-wrap: nowrap; min-height: 38px;
 }
-.brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brand { display: flex; align-items: center; gap: 8px; min-width: 0; flex-shrink: 1; }
 .brand strong { letter-spacing: -.01em; font-size: 13px; white-space: nowrap; }
 .plan-name {
   font: inherit; font-size: 13px; color: var(--ink); background: transparent;
@@ -69,7 +70,7 @@ body {
 .plan-name:hover { border-color: var(--line); }
 .plan-name:focus { outline: none; border-color: var(--accent); background: var(--bg); }
 
-.tools { display: flex; align-items: center; gap: 5px; flex-wrap: nowrap; overflow-x: auto; }
+.tools { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
 .status { color: var(--faint); font-size: 11.5px; min-width: 58px; }
 .divider { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
 
@@ -97,13 +98,14 @@ button.danger:hover { border-color: var(--danger); }
 /* Fluid across desktop sizes: the panel gives ground before the plan does. */
 .layout {
   flex: 1; display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(240px, 21vw, 320px);
-  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) clamp(230px, 21vw, 320px);
+  min-height: 0; min-width: 0; overflow: hidden;
 }
+.layout > * { min-width: 0; }
 .layout.collapsed { grid-template-columns: minmax(0, 1fr); }
 .layout.collapsed .side { display: none; }
 
-.stage-wrap { position: relative; min-width: 0; overflow: hidden; }
+.stage-wrap { position: relative; min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
 /* The view is driven by the SVG viewBox, so the stage itself never scrolls. */
 .stage { position: absolute; inset: 0; overflow: hidden; }
 #plan { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
@@ -129,7 +131,8 @@ button.danger:hover { border-color: var(--danger); }
 
 .side {
   border-left: 1px solid var(--line); background: var(--panel);
-  overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px;
+  overflow-y: auto; overflow-x: hidden; padding: 12px;
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
 }
 
 .card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
@@ -199,7 +202,7 @@ input[type=range] {
 /* Narrower desktop windows: shed the hint, then the panel. */
 @media (max-width: 1280px) { .pan-hint { display: none; } }
 
-@media (max-width: 1080px) {
+@media (max-width: 1200px) {
   .topbar { flex-wrap: wrap; }
   .brand strong { display: none; }
   .status { display: none; }
