@@ -91,3 +91,12 @@ tools/       the generator for plan-data.js
 
 The plan's own styling lives in `app.js` rather than the stylesheet, so exported
 pictures carry their styles with them and look right anywhere.
+
+## Deploying
+
+Any static host works. This copy runs on GitHub Pages from `main`.
+
+Assets are loaded with a `?v=N` query string. **Bump that number in
+`index.html` whenever you change `app.js`, `app.css` or `plan-data.js`** —
+hosts cache those files for minutes, and a fresh page paired with a stale
+script is a broken page.
